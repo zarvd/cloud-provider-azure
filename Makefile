@@ -18,6 +18,8 @@ SHELL=/bin/bash -o pipefail
 BIN_DIR=bin
 PKG_CONFIG=.pkg_config
 
+GOLANG_VERSION=1.17
+
 ARCH ?= amd64
 # golang/strecth supports only amd64, arm32v7, arm64v8 and i386, before we have an
 # explicit requirement for other arch support, let's keep golang/stretch
@@ -114,7 +116,7 @@ $(BIN_DIR)/azure-cloud-controller-manager: $(PKG_CONFIG) $(wildcard cmd/cloud-co
 .PHONY: docker-pull-prerequisites
 docker-pull-prerequisites: ## Pull prerequisite images.
 	docker pull docker/dockerfile:1.1-experimental
-	docker pull docker.io/library/golang:1.17-buster
+	docker pull docker.io/library/golang:$(GOLANG_VERSION)-buster
 	docker pull gcr.io/distroless/static:latest
 
 buildx-setup:
