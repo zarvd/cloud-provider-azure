@@ -164,17 +164,16 @@ jobs:
           VERSION_PATCH="${VERSION##*.}"
 
           BRANCH=release-${VERSION_MAJOR}.${VERSION_MINOR}
-          if [[ ! `git show-ref refs/remotes/origin/${BRANCH}` ]]; then
+          if [[ ! `git show-ref ${BRANCH}` ]]; then
             BRANCH=master
           fi
 
           if [[ "${VERSION_PATCH}" = "0" ]]; then
             START_TAG=remotes/origin/release-${VERSION_MAJOR}.$((VERSION_MINOR-1))
-            START_SHA=$(git rev-parse ) 
           else
             START_TAG=v${VERSION_MAJOR}.${VERSION_MINOR}.$((VERSION_PATCH-1))
-            START_SHA=$(git rev-parse )
           fi
+          START_SHA=$(git rev-parse ${START_TAG}) 
           END_TAG=${GITHUB_REF_NAME}
           END_SHA=$(git rev-parse ${END_TAG})
 
