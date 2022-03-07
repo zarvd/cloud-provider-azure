@@ -33,7 +33,7 @@ import (
 )
 
 // AttachDisk attaches a disk to vm
-func (ss *ScaleSet) AttachDisk(ctx context.Context, nodeName types.NodeName, diskMap map[string]*AttachDiskOptions) (*azure.Future, error) {
+func (ss *uniformScaleSet) AttachDisk(ctx context.Context, nodeName types.NodeName, diskMap map[string]*AttachDiskOptions) (*azure.Future, error) {
 	vmName := mapNodeNameToVMName(nodeName)
 	vm, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 	if err != nil {
@@ -126,7 +126,7 @@ func (ss *ScaleSet) AttachDisk(ctx context.Context, nodeName types.NodeName, dis
 }
 
 // WaitForUpdateResult waits for the response of the update request
-func (ss *ScaleSet) WaitForUpdateResult(ctx context.Context, future *azure.Future, resourceGroupName, source string) error {
+func (ss *uniformScaleSet) WaitForUpdateResult(ctx context.Context, future *azure.Future, resourceGroupName, source string) error {
 	if rerr := ss.VirtualMachineScaleSetVMsClient.WaitForUpdateResult(ctx, future, resourceGroupName, source); rerr != nil {
 		return rerr.Error()
 	}
@@ -134,7 +134,7 @@ func (ss *ScaleSet) WaitForUpdateResult(ctx context.Context, future *azure.Futur
 }
 
 // DetachDisk detaches a disk from VM
-func (ss *ScaleSet) DetachDisk(ctx context.Context, nodeName types.NodeName, diskMap map[string]string) error {
+func (ss *uniformScaleSet) DetachDisk(ctx context.Context, nodeName types.NodeName, diskMap map[string]string) error {
 	vmName := mapNodeNameToVMName(nodeName)
 	vm, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 	if err != nil {
@@ -215,7 +215,7 @@ func (ss *ScaleSet) DetachDisk(ctx context.Context, nodeName types.NodeName, dis
 }
 
 // UpdateVM updates a vm
-func (ss *ScaleSet) UpdateVM(ctx context.Context, nodeName types.NodeName) error {
+func (ss *uniformScaleSet) UpdateVM(ctx context.Context, nodeName types.NodeName) error {
 	vmName := mapNodeNameToVMName(nodeName)
 	vm, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 	if err != nil {
@@ -243,7 +243,7 @@ func (ss *ScaleSet) UpdateVM(ctx context.Context, nodeName types.NodeName) error
 }
 
 // GetDataDisks gets a list of data disks attached to the node.
-func (ss *ScaleSet) GetDataDisks(nodeName types.NodeName, crt azcache.AzureCacheReadType) ([]compute.DataDisk, *string, error) {
+func (ss *uniformScaleSet) GetDataDisks(nodeName types.NodeName, crt azcache.AzureCacheReadType) ([]compute.DataDisk, *string, error) {
 	vm, err := ss.getVmssVM(string(nodeName), crt)
 	if err != nil {
 		return nil, nil, err

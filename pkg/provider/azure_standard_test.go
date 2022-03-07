@@ -1458,7 +1458,7 @@ func TestStandardEnsureHostInPool(t *testing.T) {
 		mockInterfaceClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nicName, gomock.Any()).Return(testNIC, nil).AnyTimes()
 		mockInterfaceClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.ResourceGroup, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-		_, _, _, vm, err := cloud.VMSet.EnsureHostInPool(test.service, test.nodeName, test.backendPoolID, test.vmSetName)
+		_, vm, err := cloud.VMSet.EnsureHostInPool(test.service, test.nodeName, test.backendPoolID, test.vmSetName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Nil(t, vm, test.name)
 	}

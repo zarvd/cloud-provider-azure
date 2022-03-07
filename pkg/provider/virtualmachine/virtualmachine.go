@@ -17,6 +17,8 @@ limitations under the License.
 package virtualmachine
 
 import (
+	"strings"
+
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-07-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -35,6 +37,21 @@ const (
 	VMAS Manage = "vmas"
 )
 
+type VMSSMode string
+
+const (
+	Uniform  VMSSMode = "uniform"
+	Flexible VMSSMode = "flexible"
+)
+
+func (o VMSSMode) IsUniform() bool {
+	return o == Uniform
+}
+
+func (o VMSSMode) IsFlexible() bool {
+	return o == Flexible
+}
+
 type ManageOption = func(*VirtualMachine)
 
 // ByVMSS specifies that the virtual machine is managed by a virtual machine scale set.
@@ -45,24 +62,38 @@ func ByVMSS(vmssName string) ManageOption {
 	}
 }
 
+func ByVMAS(vmasName string) ManageOption {
+	return func(vm *VirtualMachine) {
+		vm.Manage = VMAS
+		vm.VMSSName = vmasName
+	}
+}
+
 type VirtualMachine struct {
 	Variant Variant
 	vm      *compute.VirtualMachine
 	vmssVM  *compute.VirtualMachineScaleSetVM
 
-	Manage   Manage
-	VMSSName string
+	ResourceGroup string
+	Manage        Manage
+	VMSSName      string
+	VMASName      string
 
 	// re-export fields
 	// common fields
-	ID        string
-	Name      string
-	Location  string
-	Tags      map[string]string
-	Zones     []string
-	Type      string
-	Plan      *compute.Plan
-	Resources *[]compute.VirtualMachineExtension
+	ID                 string
+	Name               string
+	Location           string
+	Tags               map[string]string
+	Zones              []string
+	Type               string
+	Plan               *compute.Plan
+	Resources          *[]compute.VirtualMachineExtension
+	OSProfile          *compute.OSProfile
+	NetworkProfile     *compute.NetworkProfile
+	HardwareProfile    *compute.HardwareProfile
+	InstanceViewStatus *[]compute.InstanceViewStatus
+	ProvisioningState  string
 
 	// fields of VirtualMachine
 	Identity                 *compute.VirtualMachineIdentity
@@ -74,44 +105,76 @@ type VirtualMachine struct {
 	VirtualMachineScaleSetVMProperties *compute.VirtualMachineScaleSetVMProperties
 }
 
-func FromVirtualMachine(vm *compute.VirtualMachine, opt ...ManageOption) *VirtualMachine {
+func FromVirtualMachine(resourceGroup string, vm *compute.VirtualMachine, opts ...ManageOption) *VirtualMachine {
 	v := &VirtualMachine{
-		vm:      vm,
-		Variant: VariantVirtualMachine,
+		vm:            vm,
+		Variant:       VariantVirtualMachine,
+		Manage:        VMAS,
+		ResourceGroup: resourceGroup,
 
-		ID:        to.String(vm.ID),
-		Name:      to.String(vm.Name),
-		Type:      to.String(vm.Type),
-		Location:  to.String(vm.Location),
-		Tags:      to.StringMap(vm.Tags),
-		Zones:     to.StringSlice(vm.Zones),
-		Plan:      vm.Plan,
-		Resources: vm.Resources,
+		ID:                 to.String(vm.ID),
+		Name:               to.String(vm.Name),
+		Type:               to.String(vm.Type),
+		Location:           to.String(vm.Location),
+		Tags:               to.StringMap(vm.Tags),
+		Zones:              to.StringSlice(vm.Zones),
+		Plan:               vm.Plan,
+		Resources:          vm.Resources,
+		OSProfile:          vm.OsProfile,
+		NetworkProfile:     vm.NetworkProfile,
+		HardwareProfile:    vm.HardwareProfile,
+		InstanceViewStatus: vm.InstanceView.Statuses, // FIXME: check pointer
+		ProvisioningState:  to.String(vm.ProvisioningState),
 
 		Identity:                 vm.Identity,
 		VirtualMachineProperties: vm.VirtualMachineProperties,
 	}
 
-	for _, opt := range opt {
+	if vm.VirtualMachineProperties != nil &&
+		vm.VirtualMachineProperties.VirtualMachineScaleSet != nil &&
+		vm.VirtualMachineProperties.VirtualMachineScaleSet.ID != nil {
+		// managed by VMSS
+		parts := strings.Split(*vm.VirtualMachineProperties.VirtualMachineScaleSet.ID, "/")
+		vmssName := parts[len(parts)-1]
+		opts = append(opts, ByVMSS(vmssName))
+	}
+
+	if vm.VirtualMachineProperties != nil &&
+		vm.VirtualMachineProperties.AvailabilitySet != nil &&
+		vm.VirtualMachineProperties.AvailabilitySet.ID != nil {
+		// managed by VMSS
+		parts := strings.Split(*vm.VirtualMachineProperties.AvailabilitySet.ID, "/")
+		vmasName := parts[len(parts)-1]
+		opts = append(opts, ByVMAS(vmasName))
+	}
+
+	for _, opt := range opts {
 		opt(v)
 	}
 
 	return v
 }
 
-func FromVirtualMachineScaleSetVM(vm *compute.VirtualMachineScaleSetVM, opt ManageOption) *VirtualMachine {
+func FromVirtualMachineScaleSetVM(resourceGroup string, vm *compute.VirtualMachineScaleSetVM, opt ManageOption) *VirtualMachine {
 	v := &VirtualMachine{
-		Variant: VariantVirtualMachineScaleSetVM,
-		vmssVM:  vm,
+		Variant:       VariantVirtualMachineScaleSetVM,
+		Manage:        VMSS,
+		ResourceGroup: resourceGroup,
+		vmssVM:        vm,
 
-		ID:        to.String(vm.ID),
-		Name:      to.String(vm.Name),
-		Type:      to.String(vm.Type),
-		Location:  to.String(vm.Location),
-		Tags:      to.StringMap(vm.Tags),
-		Zones:     to.StringSlice(vm.Zones),
-		Plan:      vm.Plan,
-		Resources: vm.Resources,
+		ID:                 to.String(vm.ID),
+		Name:               to.String(vm.Name),
+		Type:               to.String(vm.Type),
+		Location:           to.String(vm.Location),
+		Tags:               to.StringMap(vm.Tags),
+		Zones:              to.StringSlice(vm.Zones),
+		Plan:               vm.Plan,
+		Resources:          vm.Resources,
+		OSProfile:          vm.OsProfile,
+		NetworkProfile:     vm.NetworkProfile,
+		HardwareProfile:    vm.HardwareProfile,
+		InstanceViewStatus: vm.InstanceView.Statuses,
+		ProvisioningState:  to.String(vm.ProvisioningState),
 
 		SKU:                                vm.Sku,
 		InstanceID:                         to.String(vm.InstanceID),

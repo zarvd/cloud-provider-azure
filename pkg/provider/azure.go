@@ -585,7 +585,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret, callFromC
 	}
 
 	if strings.EqualFold(consts.VMTypeVMSS, az.Config.VMType) {
-		az.VMSet, err = newScaleSet(az)
+		az.VMSet, err = newUniformScaleSet(az)
 		if err != nil {
 			return err
 		}

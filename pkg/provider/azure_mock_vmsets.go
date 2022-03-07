@@ -19,6 +19,7 @@ package provider
 import (
 	context "context"
 	reflect "reflect"
+	"sigs.k8s.io/cloud-provider-azure/pkg/provider/virtualmachine"
 
 	compute "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-07-01/compute"
 	network "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
@@ -203,15 +204,14 @@ func (mr *MockVMSetMockRecorder) EnsureHostsInPool(service, nodes, backendPoolID
 }
 
 // EnsureHostInPool mocks base method
-func (m *MockVMSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID, vmSetName string) (string, string, string, *compute.VirtualMachineScaleSetVM, error) {
+func (m *MockVMSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID,
+		vmSetName string) (string, *virtualmachine.VirtualMachine, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnsureHostInPool", service, nodeName, backendPoolID, vmSetName)
 	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(string)
-	ret3, _ := ret[3].(*compute.VirtualMachineScaleSetVM)
-	ret4, _ := ret[4].(error)
-	return ret0, ret1, ret2, ret3, ret4
+	ret1, _ := ret[3].(*virtualmachine.VirtualMachine)
+	ret2, _ := ret[4].(error)
+	return ret0, ret1, ret2
 }
 
 // EnsureHostInPool indicates an expected call of EnsureHostInPool

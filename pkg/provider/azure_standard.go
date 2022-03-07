@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"regexp"
+	"sigs.k8s.io/cloud-provider-azure/pkg/provider/virtualmachine"
 	"strconv"
 	"strings"
 	"sync"
@@ -481,7 +482,7 @@ func (as *availabilitySet) newVMASCache() (*azcache.TimedCache, error) {
 }
 
 // newStandardSet creates a new availabilitySet.
-func newAvailabilitySet(az *Cloud) (VMSet, error) {
+func newAvailabilitySet(az *Cloud) (*availabilitySet, error) {
 	as := &availabilitySet{
 		Cloud: az,
 	}
@@ -527,67 +528,6 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 		return "", err
 	}
 	return convertedResourceID, nil
-}
-
-// GetPowerStatusByNodeName returns the power state of the specified node.
-func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState string, err error) {
-	vm, err := as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeDefault)
-	if err != nil {
-		return powerState, err
-	}
-
-	if vm.InstanceView != nil && vm.InstanceView.Statuses != nil {
-		statuses := *vm.InstanceView.Statuses
-		for _, status := range statuses {
-			state := to.String(status.Code)
-			if strings.HasPrefix(state, vmPowerStatePrefix) {
-				return strings.TrimPrefix(state, vmPowerStatePrefix), nil
-			}
-		}
-	}
-
-	// vm.InstanceView or vm.InstanceView.Statuses are nil when the VM is under deleting.
-	klog.V(3).Infof("InstanceView for node %q is nil, assuming it's stopped", name)
-	return vmPowerStateStopped, nil
-}
-
-// GetProvisioningStateByNodeName returns the provisioningState for the specified node.
-func (as *availabilitySet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
-	vm, err := as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeDefault)
-	if err != nil {
-		return provisioningState, err
-	}
-
-	if vm.VirtualMachineProperties == nil || vm.VirtualMachineProperties.ProvisioningState == nil {
-		return provisioningState, nil
-	}
-
-	return to.String(vm.VirtualMachineProperties.ProvisioningState), nil
-}
-
-// GetNodeNameByProviderID gets the node name by provider ID.
-func (as *availabilitySet) GetNodeNameByProviderID(providerID string) (types.NodeName, error) {
-	// NodeName is part of providerID for standard instances.
-	matches := providerIDRE.FindStringSubmatch(providerID)
-	if len(matches) != 2 {
-		return "", errors.New("error splitting providerID")
-	}
-
-	return types.NodeName(matches[1]), nil
-}
-
-// GetInstanceTypeByNodeName gets the instance type by node name.
-func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error) {
-	machine, err := as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeUnsafe)
-	if err != nil {
-		klog.Errorf("as.GetInstanceTypeByNodeName(%s) failed: as.getVirtualMachine(%s) err=%v", name, name, err)
-		return "", err
-	}
-
-	if machine.HardwareProfile == nil {
-		return "", fmt.Errorf("HardwareProfile of node(%s) is nil", name)
-	}
-	return string(machine.HardwareProfile.VMSize), nil
 }
 
 // GetZoneByNodeName gets availability zone for the specified node. If the node is not running
@@ -683,42 +623,6 @@ func (as *availabilitySet) GetPrivateIPsByNodeName(name string) ([]string, error
 	return ips, nil
 }
 
-// getAgentPoolAvailabilitySets lists the virtual machines for the resource group and then builds
-// a list of availability sets that match the nodes available to k8s.
-func (as *availabilitySet) getAgentPoolAvailabilitySets(vms []compute.VirtualMachine, nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {
-	vmNameToAvailabilitySetID := make(map[string]string, len(vms))
-	for vmx := range vms {
-		vm := vms[vmx]
-		if vm.AvailabilitySet != nil {
-			vmNameToAvailabilitySetID[*vm.Name] = *vm.AvailabilitySet.ID
-		}
-	}
-	agentPoolAvailabilitySets = &[]string{}
-	for nx := range nodes {
-		nodeName := (*nodes[nx]).Name
-		if isControlPlaneNode(nodes[nx]) {
-			continue
-		}
-		asID, ok := vmNameToAvailabilitySetID[nodeName]
-		if !ok {
-			klog.Warningf("as.getNodeAvailabilitySet - Node(%s) has no availability sets", nodeName)
-			continue
-		}
-		asName, err := getLastSegment(asID, "/")
-		if err != nil {
-			klog.Errorf("as.getNodeAvailabilitySet - Node (%s)- getLastSegment(%s), err=%v", nodeName, asID, err)
-			return nil, err
-		}
-		// AvailabilitySet ID is currently upper cased in a non-deterministic way
-		// We want to keep it lower case, before the ID get fixed
-		asName = strings.ToLower(asName)
-
-		*agentPoolAvailabilitySets = append(*agentPoolAvailabilitySets, asName)
-	}
-
-	return agentPoolAvailabilitySets, nil
-}
-
 // GetVMSetNames selects all possible availability sets or scale sets
 // (depending vmType configured) for service load balancer, if the service has
 // no loadbalancer mode annotation returns the primary VMSet. If service annotation
@@ -764,50 +668,6 @@ func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) 
 	}
 
 	return availabilitySetNames, nil
-}
-
-func (as *availabilitySet) GetNodeVMSetName(node *v1.Node) (string, error) {
-	var hostName string
-	for _, nodeAddress := range node.Status.Addresses {
-		if strings.EqualFold(string(nodeAddress.Type), string(v1.NodeHostName)) {
-			hostName = nodeAddress.Address
-		}
-	}
-	if hostName == "" {
-		if name, ok := node.Labels[consts.NodeLabelHostName]; ok {
-			hostName = name
-		}
-	}
-	if hostName == "" {
-		klog.Warningf("as.GetNodeVMSetName: cannot get host name from node %s", node.Name)
-		return "", nil
-	}
-
-	vms, err := as.ListVirtualMachines(as.ResourceGroup)
-	if err != nil {
-		klog.Errorf("as.GetNodeVMSetName - ListVirtualMachines failed, err=%v", err)
-		return "", err
-	}
-
-	var asName string
-	for _, vm := range vms {
-		if strings.EqualFold(to.String(vm.Name), hostName) {
-			if vm.AvailabilitySet != nil && to.String(vm.AvailabilitySet.ID) != "" {
-				klog.V(4).Infof("as.GetNodeVMSetName: found vm %s", hostName)
-
-				asName, err = getLastSegment(to.String(vm.AvailabilitySet.ID), "/")
-				if err != nil {
-					klog.Errorf("as.GetNodeVMSetName: failed to get last segment of ID %s: %s", to.String(vm.AvailabilitySet.ID), err)
-					return "", err
-				}
-			}
-
-			break
-		}
-	}
-
-	klog.V(4).Infof("as.GetNodeVMSetName: found availability set name %s from node name %s", asName, node.Name)
-	return asName, nil
 }
 
 // GetPrimaryInterface gets machine primary network interface by node name.
@@ -905,23 +765,24 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 
 // EnsureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
 // participating in the specified LoadBalancer Backend Pool.
-func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string) (string, string, string, *compute.VirtualMachineScaleSetVM, error) {
+func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string,
+	vmSetName string) (string, *virtualmachine.VirtualMachine, error) {
 	vmName := mapNodeNameToVMName(nodeName)
 	serviceName := getServiceName(service)
 	nic, _, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
 	if err != nil {
 		if errors.Is(err, errNotInVMSet) {
 			klog.V(3).Infof("EnsureHostInPool skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
-			return "", "", "", nil, nil
+			return "", nil, nil
 		}
 
 		klog.Errorf("error: az.EnsureHostInPool(%s), az.VMSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
-		return "", "", "", nil, err
+		return "", nil, err
 	}
 
 	if nic.ProvisioningState == consts.NicFailedState {
 		klog.Warningf("EnsureHostInPool skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
-		return "", "", "", nil, nil
+		return "", nil, nil
 	}
 
 	var primaryIPConfig *network.InterfaceIPConfiguration
@@ -929,12 +790,12 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 	if !as.Cloud.ipv6DualStackEnabled && !ipv6 {
 		primaryIPConfig, err = getPrimaryIPConfig(nic)
 		if err != nil {
-			return "", "", "", nil, err
+			return "", nil, err
 		}
 	} else {
 		primaryIPConfig, err = getIPConfigByIPFamily(nic, ipv6)
 		if err != nil {
-			return "", "", "", nil, err
+			return "", nil, err
 		}
 	}
 
@@ -963,11 +824,11 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 			}
 			isSameLB, oldLBName, err := isBackendPoolOnSameLB(backendPoolID, newBackendPoolsIDs)
 			if err != nil {
-				return "", "", "", nil, err
+				return "", nil, err
 			}
 			if !isSameLB {
 				klog.V(4).Infof("Node %q has already been added to LB %q, omit adding it to a new one", nodeName, oldLBName)
-				return "", "", "", nil, nil
+				return "", nil, nil
 			}
 		}
 
@@ -982,10 +843,10 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 		klog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
 		err := as.CreateOrUpdateInterface(service, nic)
 		if err != nil {
-			return "", "", "", nil, err
+			return "", nil, err
 		}
 	}
-	return "", "", "", nil, nil
+	return "", nil, nil
 }
 
 // EnsureHostsInPool ensures the given Node's primary IP configurations are
@@ -1016,7 +877,7 @@ func (as *availabilitySet) EnsureHostsInPool(service *v1.Service, nodes []*v1.No
 		}
 
 		f := func() error {
-			_, _, _, _, err := as.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName)
+			_, _, err := as.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName)
 			if err != nil {
 				return fmt.Errorf("ensure(%s): backendPoolID(%s) - failed to ensure host in pool: %w", getServiceName(service), backendPoolID, err)
 			}
@@ -1271,50 +1132,7 @@ func (as *availabilitySet) getAvailabilitySetByNodeName(nodeName string, crt azc
 	return result, nil
 }
 
-// GetNodeCIDRMaskByProviderID returns the node CIDR subnet mask by provider ID.
-func (as *availabilitySet) GetNodeCIDRMasksByProviderID(providerID string) (int, int, error) {
-	nodeName, err := as.GetNodeNameByProviderID(providerID)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	vmas, err := as.getAvailabilitySetByNodeName(string(nodeName), azcache.CacheReadTypeDefault)
-	if err != nil {
-		if errors.Is(err, cloudprovider.InstanceNotFound) {
-			return consts.DefaultNodeMaskCIDRIPv4, consts.DefaultNodeMaskCIDRIPv6, nil
-		}
-		return 0, 0, err
-	}
-
-	var ipv4Mask, ipv6Mask int
-	if v4, ok := vmas.Tags[consts.VMSetCIDRIPV4TagKey]; ok && v4 != nil {
-		ipv4Mask, err = strconv.Atoi(to.String(v4))
-		if err != nil {
-			klog.Errorf("GetNodeCIDRMasksByProviderID: error when paring the value of the ipv4 mask size %s: %v", to.String(v4), err)
-		}
-	}
-	if v6, ok := vmas.Tags[consts.VMSetCIDRIPV6TagKey]; ok && v6 != nil {
-		ipv6Mask, err = strconv.Atoi(to.String(v6))
-		if err != nil {
-			klog.Errorf("GetNodeCIDRMasksByProviderID: error when paring the value of the ipv6 mask size%s: %v", to.String(v6), err)
-		}
-	}
-
-	return ipv4Mask, ipv6Mask, nil
-}
-
 //EnsureBackendPoolDeletedFromVMSets ensures the loadBalancer backendAddressPools deleted from the specified VMAS
 func (as *availabilitySet) EnsureBackendPoolDeletedFromVMSets(vmasNamesMap map[string]bool, backendPoolID string) error {
 	return nil
-}
-
-// GetAgentPoolVMSetNames returns all VMAS names according to the nodes
-func (as *availabilitySet) GetAgentPoolVMSetNames(nodes []*v1.Node) (*[]string, error) {
-	vms, err := as.ListVirtualMachines(as.ResourceGroup)
-	if err != nil {
-		klog.Errorf("as.getNodeAvailabilitySet - ListVirtualMachines failed, err=%v", err)
-		return nil, err
-	}
-
-	return as.getAgentPoolAvailabilitySets(vms, nodes)
 }

@@ -18,6 +18,7 @@ package provider
 
 import (
 	"context"
+	"sigs.k8s.io/cloud-provider-azure/pkg/provider/virtualmachine"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-07-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
@@ -47,6 +48,7 @@ type VMSet interface {
 	GetIPByNodeName(name string) (string, string, error)
 	// GetPrimaryInterface gets machine primary network interface by node name.
 	GetPrimaryInterface(nodeName string) (network.Interface, error)
+
 	// GetNodeNameByProviderID gets the node name by provider ID.
 	GetNodeNameByProviderID(providerID string) (types.NodeName, error)
 
@@ -69,7 +71,8 @@ type VMSet interface {
 	EnsureHostsInPool(service *v1.Service, nodes []*v1.Node, backendPoolID string, vmSetName string) error
 	// EnsureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
 	// participating in the specified LoadBalancer Backend Pool.
-	EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string) (string, string, string, *compute.VirtualMachineScaleSetVM, error)
+	EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string) (string,
+		*virtualmachine.VirtualMachine, error)
 	// EnsureBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified nodes.
 	EnsureBackendPoolDeleted(service *v1.Service, backendPoolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool, deleteFromVMSet bool) error
 	//EnsureBackendPoolDeletedFromVMSets ensures the loadBalancer backendAddressPools deleted from the specified VMSS/VMAS

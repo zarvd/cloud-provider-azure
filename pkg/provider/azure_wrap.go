@@ -25,8 +25,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-07-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
-	"github.com/Azure/go-autorest/autorest/to"
-
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
@@ -175,38 +173,7 @@ func (az *Cloud) getSecurityGroup(crt azcache.AzureCacheReadType) (network.Secur
 
 func (az *Cloud) newVMCache() (*azcache.TimedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		// Currently InstanceView request are used by azure_zones, while the calls come after non-InstanceView
-		// request. If we first send an InstanceView request and then a non InstanceView request, the second
-		// request will still hit throttling. This is what happens now for cloud controller manager: In this
-		// case we do get instance view every time to fulfill the azure_zones requirement without hitting
-		// throttling.
-		// Consider adding separate parameter for controlling 'InstanceView' once node update issue #56276 is fixed
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
 
-		resourceGroup, err := az.GetNodeResourceGroup(key)
-		if err != nil {
-			return nil, err
-		}
-
-		vm, verr := az.VirtualMachinesClient.Get(ctx, resourceGroup, key, compute.InstanceViewTypesInstanceView)
-		exists, rerr := checkResourceExistsFromError(verr)
-		if rerr != nil {
-			return nil, rerr.Error()
-		}
-
-		if !exists {
-			klog.V(2).Infof("Virtual machine %q not found", key)
-			return nil, nil
-		}
-
-		if vm.VirtualMachineProperties != nil &&
-			strings.EqualFold(to.String(vm.VirtualMachineProperties.ProvisioningState), string(compute.ProvisioningStateDeleting)) {
-			klog.V(2).Infof("Virtual machine %q is under deleting", key)
-			return nil, nil
-		}
-
-		return &vm, nil
 	}
 
 	if az.VMCacheTTLInSeconds == 0 {

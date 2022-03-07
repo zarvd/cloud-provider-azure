@@ -350,7 +350,7 @@ func (az *Cloud) cleanOrphanedLoadBalancer(lb *network.LoadBalancer, existingLBs
 			}
 
 			// if we reach here, it means the VM couldn't be deleted because it is being referenced by a VMSS
-			if _, ok := az.VMSet.(*ScaleSet); !ok {
+			if _, ok := az.VMSet.(*uniformScaleSet); !ok {
 				klog.Warningf("cleanOrphanedLoadBalancer(%s, %s, %s): unexpected VMSet type, expected VMSS", lbName, serviceName, clusterName)
 				return deleteErr.Error()
 			}

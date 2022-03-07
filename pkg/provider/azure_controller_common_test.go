@@ -204,7 +204,7 @@ func TestCommonAttachDiskWithVMSS(t *testing.T) {
 		existedDisk     *compute.Disk
 	}{
 		{
-			desc:        "an error shall be returned if convert vmSet to ScaleSet failed",
+			desc:        "an error shall be returned if convert vmSet to uniformScaleSet failed",
 			vmList:      map[string]string{"vm1": "PowerState/Running"},
 			nodeName:    "vm1",
 			isVMSS:      false,
@@ -215,7 +215,7 @@ func TestCommonAttachDiskWithVMSS(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			desc:        "an error shall be returned if convert vmSet to ScaleSet success but node is not managed by availability set",
+			desc:        "an error shall be returned if convert vmSet to uniformScaleSet success but node is not managed by availability set",
 			vmssList:    []string{"vmss-vm-000001"},
 			nodeName:    "vmss1",
 			isVMSS:      true,
@@ -246,7 +246,7 @@ func TestCommonAttachDiskWithVMSS(t *testing.T) {
 			} else {
 				testCloud.DisableAvailabilitySetNodes = true
 			}
-			ss, err := newScaleSet(testCloud)
+			ss, err := newUniformScaleSet(testCloud)
 			assert.NoError(t, err)
 			testCloud.VMSet = ss
 		}

@@ -44,19 +44,19 @@ var (
 	errPreconditionFailedEtagMismatch = fmt.Errorf("PreconditionFailedEtagMismatch")
 )
 
-// NewTestScaleSet creates a fake ScaleSet for unit test
-func NewTestScaleSet(ctrl *gomock.Controller) (*ScaleSet, error) {
+// NewTestScaleSet creates a fake uniformScaleSet for unit test
+func NewTestScaleSet(ctrl *gomock.Controller) (*uniformScaleSet, error) {
 	return newTestScaleSetWithState(ctrl)
 }
 
-func newTestScaleSetWithState(ctrl *gomock.Controller) (*ScaleSet, error) {
+func newTestScaleSetWithState(ctrl *gomock.Controller) (*uniformScaleSet, error) {
 	cloud := GetTestCloud(ctrl)
-	ss, err := newScaleSet(cloud)
+	ss, err := newUniformScaleSet(cloud)
 	if err != nil {
 		return nil, err
 	}
 
-	return ss.(*ScaleSet), nil
+	return ss.(*uniformScaleSet), nil
 }
 
 // GetTestCloud returns a fake azure cloud for unit tests in Azure related CSI drivers

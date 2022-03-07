@@ -118,10 +118,10 @@ func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName, crt azcache.Azu
 		return c.cloud.VMSet, nil
 	}
 
-	// 2. vmType is Virtual Machine Scale Set (vmss), convert vmSet to ScaleSet.
-	ss, ok := c.cloud.VMSet.(*ScaleSet)
+	// 2. vmType is Virtual Machine Scale Set (vmss), convert vmSet to uniformScaleSet.
+	ss, ok := c.cloud.VMSet.(*uniformScaleSet)
 	if !ok {
-		return nil, fmt.Errorf("error of converting vmSet (%q) to ScaleSet with vmType %q", c.cloud.VMSet, c.cloud.VMType)
+		return nil, fmt.Errorf("error of converting vmSet (%q) to uniformScaleSet with vmType %q", c.cloud.VMSet, c.cloud.VMType)
 	}
 
 	// 3. If the node is managed by availability set, then return ss.availabilitySet.

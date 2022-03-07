@@ -51,13 +51,13 @@ func TestExtractVmssVMName(t *testing.T) {
 			expectError: true,
 		},
 		{
-			description:        "correct vmss VM name should return correct ScaleSet and instanceID",
+			description:        "correct vmss VM name should return correct uniformScaleSet and instanceID",
 			vmName:             "vm_1234",
 			expectedScaleSet:   "vm",
 			expectedInstanceID: "1234",
 		},
 		{
-			description:        "correct vmss VM name with Extra Separator should return correct ScaleSet and instanceID",
+			description:        "correct vmss VM name with Extra Separator should return correct uniformScaleSet and instanceID",
 			vmName:             "vm_test_1234",
 			expectedScaleSet:   "vm_test",
 			expectedInstanceID: "1234",

@@ -279,7 +279,7 @@ func TestGetNodeIdentityByNodeName(t *testing.T) {
 		expectError  bool
 	}{
 		{
-			description:  "ScaleSet should get node identity by node name",
+			description:  "uniformScaleSet should get node identity by node name",
 			vmList:       []string{"vmssee6c2000000", "vmssee6c2000001"},
 			nodeName:     "vmssee6c2000001",
 			scaleSet:     "vmssee6c2",
@@ -287,7 +287,7 @@ func TestGetNodeIdentityByNodeName(t *testing.T) {
 			expected:     &nodeIdentity{"rg", "vmssee6c2", "vmssee6c2000001"},
 		},
 		{
-			description:  "ScaleSet should get node identity when computerNamePrefix differs from vmss name",
+			description:  "uniformScaleSet should get node identity when computerNamePrefix differs from vmss name",
 			vmList:       []string{"vmssee6c2000000", "vmssee6c2000001"},
 			nodeName:     "vmssee6c2000001",
 			scaleSet:     "ss",
@@ -295,7 +295,7 @@ func TestGetNodeIdentityByNodeName(t *testing.T) {
 			expected:     &nodeIdentity{"rg", "ss", "vmssee6c2000001"},
 		},
 		{
-			description:  "ScaleSet should get node identity by node name with upper cases hostname",
+			description:  "uniformScaleSet should get node identity by node name with upper cases hostname",
 			vmList:       []string{"VMSSEE6C2000000", "VMSSEE6C2000001"},
 			nodeName:     "vmssee6c2000001",
 			scaleSet:     "ss",
@@ -303,7 +303,7 @@ func TestGetNodeIdentityByNodeName(t *testing.T) {
 			expected:     &nodeIdentity{"rg", "ss", "vmssee6c2000001"},
 		},
 		{
-			description:  "ScaleSet should not get node identity for non-existing nodes",
+			description:  "uniformScaleSet should not get node identity for non-existing nodes",
 			vmList:       []string{"vmssee6c2000000", "vmssee6c2000001"},
 			nodeName:     "agente6c2000005",
 			scaleSet:     "ss",
@@ -354,21 +354,21 @@ func TestGetInstanceIDByNodeName(t *testing.T) {
 		expectError bool
 	}{
 		{
-			description: "ScaleSet should get instance by node name",
+			description: "uniformScaleSet should get instance by node name",
 			scaleSet:    "ss",
 			vmList:      []string{"vmssee6c2000000", "vmssee6c2000001"},
 			nodeName:    "vmssee6c2000001",
 			expected:    "/subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/ss/virtualMachines/1",
 		},
 		{
-			description: "ScaleSet should get instance by node name with upper cases hostname",
+			description: "uniformScaleSet should get instance by node name with upper cases hostname",
 			scaleSet:    "ss",
 			vmList:      []string{"VMSSEE6C2000000", "VMSSEE6C2000001"},
 			nodeName:    "vmssee6c2000000",
 			expected:    "/subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/ss/virtualMachines/0",
 		},
 		{
-			description: "ScaleSet should not get instance for non-exist nodes",
+			description: "uniformScaleSet should not get instance for non-exist nodes",
 			scaleSet:    "ss",
 			vmList:      []string{"vmssee6c2000000", "vmssee6c2000001"},
 			nodeName:    "agente6c2000005",
@@ -421,7 +421,7 @@ func TestGetZoneByNodeName(t *testing.T) {
 		expectError bool
 	}{
 		{
-			description: "ScaleSet should get faultDomain for non-zoned nodes",
+			description: "uniformScaleSet should get faultDomain for non-zoned nodes",
 			scaleSet:    "ss",
 			vmList:      []string{"vmssee6c2000000", "vmssee6c2000001"},
 			nodeName:    "vmssee6c2000000",
@@ -429,7 +429,7 @@ func TestGetZoneByNodeName(t *testing.T) {
 			expected:    "3",
 		},
 		{
-			description: "ScaleSet should get availability zone for zoned nodes",
+			description: "uniformScaleSet should get availability zone for zoned nodes",
 			scaleSet:    "ss",
 			vmList:      []string{"vmssee6c2000000", "vmssee6c2000001"},
 			nodeName:    "vmssee6c2000000",
@@ -438,7 +438,7 @@ func TestGetZoneByNodeName(t *testing.T) {
 			expected:    "westus-2",
 		},
 		{
-			description: "ScaleSet should get availability zone in lower cases",
+			description: "uniformScaleSet should get availability zone in lower cases",
 			scaleSet:    "ss",
 			vmList:      []string{"vmssee6c2000000", "vmssee6c2000001"},
 			nodeName:    "vmssee6c2000000",
@@ -448,7 +448,7 @@ func TestGetZoneByNodeName(t *testing.T) {
 			expected:    "westus-2",
 		},
 		{
-			description: "ScaleSet should return error for non-exist nodes",
+			description: "uniformScaleSet should return error for non-exist nodes",
 			scaleSet:    "ss",
 			faultDomain: 3,
 			vmList:      []string{"vmssee6c2000000", "vmssee6c2000001"},
@@ -1843,7 +1843,8 @@ func TestEnsureHostInPool(t *testing.T) {
 			expectedVMSSName:          testVMSSName,
 			expectedInstanceID:        "0",
 			expectedVMSSVM: &compute.VirtualMachineScaleSetVM{
-				Location: to.StringPtr("westus"),
+				InstanceID: to.StringPtr("0"),
+				Location:   to.StringPtr("westus"),
 				VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
 					NetworkProfileConfiguration: &compute.VirtualMachineScaleSetVMNetworkProfileConfiguration{
 						NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
@@ -1899,12 +1900,16 @@ func TestEnsureHostInPool(t *testing.T) {
 		mockVMSSVMClient := ss.cloud.VirtualMachineScaleSetVMsClient.(*mockvmssvmclient.MockInterface)
 		mockVMSSVMClient.EXPECT().List(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any()).Return(expectedVMSSVMs, nil).AnyTimes()
 
-		nodeResourceGroup, ssName, instanceID, vm, err := ss.EnsureHostInPool(test.service, test.nodeName, test.backendPoolID, test.vmSetName)
+		nodeResourceGroup, vm, err := ss.EnsureHostInPool(test.service, test.nodeName, test.backendPoolID, test.vmSetName)
 		assert.Equal(t, test.expectedErr, err, test.description+", but an error occurs")
 		assert.Equal(t, test.expectedNodeResourceGroup, nodeResourceGroup, test.description)
-		assert.Equal(t, test.expectedVMSSName, ssName, test.description)
-		assert.Equal(t, test.expectedInstanceID, instanceID, test.description)
-		assert.Equal(t, test.expectedVMSSVM, vm, test.description)
+		if test.expectedVMSSVM != nil {
+			assert.Equal(t, test.expectedVMSSVM, vm.AsVirtualMachineScaleSetVM(), test.description)
+			assert.Equal(t, test.expectedVMSSName, vm.VMSSName, test.description)
+			assert.Equal(t, test.expectedInstanceID, vm.InstanceID, test.description)
+		} else {
+			assert.Nil(t, vm, test.description)
+		}
 	}
 }
 
@@ -2238,7 +2243,8 @@ func TestEnsureBackendPoolDeletedFromNode(t *testing.T) {
 			expectedVMSSName:          testVMSSName,
 			expectedInstanceID:        "0",
 			expectedVMSSVM: &compute.VirtualMachineScaleSetVM{
-				Location: to.StringPtr("westus"),
+				InstanceID: to.StringPtr("0"),
+				Location:   to.StringPtr("westus"),
 				VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
 					NetworkProfileConfiguration: &compute.VirtualMachineScaleSetVMNetworkProfileConfiguration{
 						NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
@@ -2279,12 +2285,16 @@ func TestEnsureBackendPoolDeletedFromNode(t *testing.T) {
 		mockVMSSVMClient := ss.cloud.VirtualMachineScaleSetVMsClient.(*mockvmssvmclient.MockInterface)
 		mockVMSSVMClient.EXPECT().List(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any()).Return(expectedVMSSVMs, nil).AnyTimes()
 
-		nodeResourceGroup, ssName, instanceID, vm, err := ss.ensureBackendPoolDeletedFromNode(test.nodeName, test.backendpoolID)
+		nodeResourceGroup, vm, err := ss.ensureBackendPoolDeletedFromNode(test.nodeName, test.backendpoolID)
 		assert.Equal(t, test.expectedErr, err, test.description+", but an error occurs")
 		assert.Equal(t, test.expectedNodeResourceGroup, nodeResourceGroup, test.description)
-		assert.Equal(t, test.expectedVMSSName, ssName, test.description)
-		assert.Equal(t, test.expectedInstanceID, instanceID, test.description)
-		assert.Equal(t, test.expectedVMSSVM, vm, test.description)
+		if test.expectedVMSSVM != nil {
+			assert.Equal(t, test.expectedVMSSVM, vm.AsVirtualMachineScaleSetVM(), test.description)
+			assert.Equal(t, test.expectedVMSSName, vm.VMSSName, test.description)
+			assert.Equal(t, test.expectedInstanceID, vm.InstanceID, test.description)
+		} else {
+			assert.Nil(t, vm, test.description)
+		}
 	}
 }
 
