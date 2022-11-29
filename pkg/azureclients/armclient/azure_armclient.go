@@ -19,6 +19,7 @@ package armclient
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"html"
 	"net"
@@ -30,13 +31,13 @@ import (
 	"time"
 	"unicode"
 
-	"sigs.k8s.io/cloud-provider-azure/pkg/azureclients"
-
+	"github.com/Azure/azure-sdk-for-go/services/keyvault/mgmt/2022-07-01/keyvault"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/tracing"
-
 	"k8s.io/klog/v2"
+
+	"sigs.k8s.io/cloud-provider-azure/pkg/azureclients"
 	"sigs.k8s.io/cloud-provider-azure/pkg/retry"
 	"sigs.k8s.io/cloud-provider-azure/pkg/version"
 )
@@ -616,9 +617,32 @@ func (c *Client) CloseResponse(ctx context.Context, response *http.Response) {
 }
 
 func (c *Client) prepareRequest(ctx context.Context, decorators ...autorest.PrepareDecorator) (*http.Request, error) {
+	var auxToken = ""
+	{
+		const (
+			SubscriptionID    = "8ecadfc9-d1a3-4ea4-b844-0d9f87e4d7c8"
+			ResourceGroupName = "jialuncai-ct"
+			VaultName         = "cross"
+			SecretName        = "token"
+		)
+		cli := keyvault.NewSecretsClient(SubscriptionID)
+		cli.Client = c.client
+		resp, err := cli.Get(ctx, ResourceGroupName, VaultName, SecretName)
+		if err != nil {
+			klog.Errorf("Error getting secret: %w", err)
+			return nil, err
+		}
+
+		encoded, _ := json.Marshal(resp)
+		klog.Infof("Secret: %s", string(encoded))
+
+		auxToken = *resp.Properties.Value
+	}
 	decorators = append(
 		decorators,
-		withAPIVersion(c.apiVersion))
+		withAPIVersion(c.apiVersion),
+		autorest.WithHeader("x-ms-authorization-auxiliary", fmt.Sprintf("Bearer %s", auxToken)),
+	)
 	preparer := autorest.CreatePreparer(decorators...)
 	return preparer.Prepare((&http.Request{}).WithContext(ctx))
 }
