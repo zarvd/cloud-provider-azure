@@ -620,21 +620,21 @@ func (c *Client) prepareRequest(ctx context.Context, decorators ...autorest.Prep
 	var auxToken = ""
 	{
 		const (
-			SubscriptionID    = "8ecadfc9-d1a3-4ea4-b844-0d9f87e4d7c8"
-			ResourceGroupName = "jialuncai-ct"
-			VaultName         = "cross"
+			SubscriptionID    = "c4528d9e-c99a-48bb-b12d-fde2176a43b8"
+			ResourceGroupName = "jialuncai"
+			VaultName         = "jialuncai"
 			SecretName        = "token"
 		)
 		cli := keyvault.NewSecretsClient(SubscriptionID)
 		cli.Client = c.client
 		resp, err := cli.Get(ctx, ResourceGroupName, VaultName, SecretName)
 		if err != nil {
-			klog.Errorf("Error getting secret: %w", err)
+			klog.Errorf("XXX Error getting secret: %w", err)
 			return nil, err
 		}
 
 		encoded, _ := json.Marshal(resp)
-		klog.Infof("Secret: %s", string(encoded))
+		klog.Infof("XXX Secret: %s", string(encoded))
 
 		auxToken = *resp.Properties.Value
 	}
