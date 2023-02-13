@@ -10,133 +10,133 @@ permissions:
   contents: read
 
 jobs:
-  build-cloud-controller-manager:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - os: linux
-            arch: amd64
-          - os: linux
-            arch: arm
-          - os: linux
-            arch: arm64
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup Golang
-        uses: actions/setup-go@v3
-        with:
-          go-version-file: go.mod
-      - name: Build binary
-        run: |
-          rm -rf ./bin
-          ARCH=${{ matrix.arch }} make bin/azure-cloud-controller-manager
-          mv bin/azure-cloud-controller-manager bin/azure-cloud-controller-manager-${{ matrix.os }}-${{ matrix.arch }}
-      - uses: actions/upload-artifact@v3
-        with:
-          name: cloud-controller-manager-${{ matrix.os }}-${{ matrix.arch }}
-          path: bin/azure-cloud-controller-manager-${{ matrix.os }}-${{ matrix.arch }}
-          if-no-files-found: error
-
-  build-cloud-node-manager:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - os: linux
-            arch: amd64
-          - os: linux
-            arch: arm
-          - os: linux
-            arch: arm64
-          - os: windows
-            arch: amd64
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup Golang
-        uses: actions/setup-go@v3
-        with:
-          go-version-file: go.mod
-      - name: Build binary for linux
-        if: matrix.os == 'linux'
-        run: |
-          rm -rf ./bin
-          ARCH=${{ matrix.arch }} make bin/azure-cloud-node-manager
-          mv bin/azure-cloud-node-manager bin/azure-cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}
-      - name: Build binary for windows
-        if: matrix.os == 'windows'
-        run: |
-          rm -rf ./bin
-          ARCH=${{ matrix.arch }} make bin/azure-cloud-node-manager.exe
-          mv bin/azure-cloud-node-manager-${{ matrix.arch }}.exe bin/azure-cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}.exe
-      - name: Upload artifact for linux
-        if: matrix.os == 'linux'
-        uses: actions/upload-artifact@v3
-        with:
-          name: cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}
-          path: bin/azure-cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}
-      - name: Upload artifact for windows
-        if: matrix.os == 'windows'
-        uses: actions/upload-artifact@v3
-        with:
-          name: cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}
-          path: bin/azure-cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}.exe
-          if-no-files-found: error
-
-  build-acr-credential-provider:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - os: linux
-            arch: amd64
-          - os: linux
-            arch: arm
-          - os: linux
-            arch: arm64
-          - os: windows
-            arch: amd64
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup Golang
-        uses: actions/setup-go@v3
-        with:
-          go-version-file: go.mod
-      - name: Build binary for linux
-        if: matrix.os == 'linux'
-        run: |
-          rm -rf ./bin
-          ARCH=${{ matrix.arch }} make bin/azure-acr-credential-provider
-          mv bin/azure-acr-credential-provider bin/azure-acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}
-      - name: Build binary for windows
-        if: matrix.os == 'windows'
-        run: |
-          rm -rf ./bin
-          ARCH=${{ matrix.arch }} make bin/azure-acr-credential-provider.exe
-          mv bin/azure-acr-credential-provider.exe bin/azure-acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}.exe
-      - name: Upload artifact for linux
-        if: matrix.os == 'linux'
-        uses: actions/upload-artifact@v3
-        with:
-          name: acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}
-          path: bin/azure-acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}
-      - name: Upload artifact for windows
-        if: matrix.os == 'windows'
-        uses: actions/upload-artifact@v3
-        with:
-          name: acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}
-          path: bin/azure-acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}.exe
-          if-no-files-found: error
+#  build-cloud-controller-manager:
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        include:
+#          - os: linux
+#            arch: amd64
+#          - os: linux
+#            arch: arm
+#          - os: linux
+#            arch: arm64
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#      - name: Setup Golang
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version-file: go.mod
+#      - name: Build binary
+#        run: |
+#          rm -rf ./bin
+#          ARCH=${{ matrix.arch }} make bin/azure-cloud-controller-manager
+#          mv bin/azure-cloud-controller-manager bin/azure-cloud-controller-manager-${{ matrix.os }}-${{ matrix.arch }}
+#      - uses: actions/upload-artifact@v3
+#        with:
+#          name: cloud-controller-manager-${{ matrix.os }}-${{ matrix.arch }}
+#          path: bin/azure-cloud-controller-manager-${{ matrix.os }}-${{ matrix.arch }}
+#          if-no-files-found: error
+#
+#  build-cloud-node-manager:
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        include:
+#          - os: linux
+#            arch: amd64
+#          - os: linux
+#            arch: arm
+#          - os: linux
+#            arch: arm64
+#          - os: windows
+#            arch: amd64
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#      - name: Setup Golang
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version-file: go.mod
+#      - name: Build binary for linux
+#        if: matrix.os == 'linux'
+#        run: |
+#          rm -rf ./bin
+#          ARCH=${{ matrix.arch }} make bin/azure-cloud-node-manager
+#          mv bin/azure-cloud-node-manager bin/azure-cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}
+#      - name: Build binary for windows
+#        if: matrix.os == 'windows'
+#        run: |
+#          rm -rf ./bin
+#          ARCH=${{ matrix.arch }} make bin/azure-cloud-node-manager.exe
+#          mv bin/azure-cloud-node-manager-${{ matrix.arch }}.exe bin/azure-cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}.exe
+#      - name: Upload artifact for linux
+#        if: matrix.os == 'linux'
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}
+#          path: bin/azure-cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}
+#      - name: Upload artifact for windows
+#        if: matrix.os == 'windows'
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}
+#          path: bin/azure-cloud-node-manager-${{ matrix.os }}-${{ matrix.arch }}.exe
+#          if-no-files-found: error
+#
+#  build-acr-credential-provider:
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        include:
+#          - os: linux
+#            arch: amd64
+#          - os: linux
+#            arch: arm
+#          - os: linux
+#            arch: arm64
+#          - os: windows
+#            arch: amd64
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#      - name: Setup Golang
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version-file: go.mod
+#      - name: Build binary for linux
+#        if: matrix.os == 'linux'
+#        run: |
+#          rm -rf ./bin
+#          ARCH=${{ matrix.arch }} make bin/azure-acr-credential-provider
+#          mv bin/azure-acr-credential-provider bin/azure-acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}
+#      - name: Build binary for windows
+#        if: matrix.os == 'windows'
+#        run: |
+#          rm -rf ./bin
+#          ARCH=${{ matrix.arch }} make bin/azure-acr-credential-provider.exe
+#          mv bin/azure-acr-credential-provider.exe bin/azure-acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}.exe
+#      - name: Upload artifact for linux
+#        if: matrix.os == 'linux'
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}
+#          path: bin/azure-acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}
+#      - name: Upload artifact for windows
+#        if: matrix.os == 'windows'
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}
+#          path: bin/azure-acr-credential-provider-${{ matrix.os }}-${{ matrix.arch }}.exe
+#          if-no-files-found: error
 
   publish:
     runs-on: ubuntu-latest
-    needs:
-      - build-cloud-controller-manager
-      - build-cloud-node-manager
-      - build-acr-credential-provider
+#    needs:
+#      - build-cloud-controller-manager
+#      - build-cloud-node-manager
+#      - build-acr-credential-provider
     permissions:
       contents: write
       pull-requests: write
@@ -144,7 +144,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          ref: master
+          ref: fake-master
           fetch-depth: 0
       - name: Setup Golang
         uses: actions/setup-go@v3
@@ -173,7 +173,7 @@ jobs:
         with:
           branch: doc/release-note-${{github.ref_name}}
           delete-branch: true
-          base: master
+          base: fake-master
           commit-message: Update release notes for ${{github.ref_name}}
           add-paths: |
             ./site/content/en/blog/releases/*.md
