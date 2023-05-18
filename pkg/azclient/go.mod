@@ -19,7 +19,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	gopkg.in/dnaeon/go-vcr.v2 v2.3.0
 	gopkg.in/dnaeon/go-vcr.v3 v3.1.2
-	k8s.io/client-go v0.27.1
+	k8s.io/client-go v0.27.2
 	k8s.io/klog/v2 v2.100.1
 	sigs.k8s.io/controller-tools v0.12.0
 )
@@ -51,6 +51,6 @@ require (
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apimachinery v0.27.1 // indirect
+	k8s.io/apimachinery v0.27.2 // indirect
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491 // indirect
 )
