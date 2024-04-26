@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -31,6 +32,7 @@ type KeyVaultCredential struct {
 	secretClient *azsecrets.Client
 	secretPath   string
 
+	mtx   sync.RWMutex
 	token *azcore.AccessToken
 }
 
@@ -52,6 +54,7 @@ func NewKeyVaultCredential(
 	rv := &KeyVaultCredential{
 		secretClient: cli,
 		secretPath:   secretName,
+		mtx:          sync.RWMutex{},
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -64,7 +67,26 @@ func NewKeyVaultCredential(
 }
 
 func (c *KeyVaultCredential) refreshToken(ctx context.Context) error {
-	const LatestVersion = ""
+	const (
+		LatestVersion      = ""
+		RefreshTokenOffset = 5 * time.Minute
+	)
+
+	{
+		c.mtx.RLock()
+		if c.token != nil && c.token.ExpiresOn.Add(RefreshTokenOffset).Before(time.Now()) {
+			c.mtx.RUnlock()
+			return nil
+		}
+		c.mtx.RUnlock()
+	}
+
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	if c.token != nil && c.token.ExpiresOn.Add(RefreshTokenOffset).Before(time.Now()) {
+		return nil
+	}
 
 	resp, err := c.secretClient.GetSecret(ctx, c.secretPath, LatestVersion, nil)
 	if err != nil {
@@ -88,12 +110,6 @@ func (c *KeyVaultCredential) refreshToken(ctx context.Context) error {
 }
 
 func (c *KeyVaultCredential) GetToken(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
-	const RefreshTokenOffset = 5 * time.Minute
-
-	if c.token != nil && c.token.ExpiresOn.Add(RefreshTokenOffset).Before(time.Now()) {
-		return *c.token, nil
-	}
-
 	if err := c.refreshToken(ctx); err != nil {
 		return azcore.AccessToken{}, fmt.Errorf("refresh token: %w", err)
 	}
