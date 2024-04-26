@@ -48,7 +48,7 @@ type AzureAuthConfig struct {
 }
 
 type AzureAuthAuxiliaryTokenProvider struct {
-	KeyVaultURL string `json:"keyVaultURL,omitempty" yaml:"keyVaultURL,omitempty"`
+	KeyVaultURL string `json:"keyVaultUrl,omitempty" yaml:"keyVaultUrl,omitempty"`
 	SecretName  string `json:"secretName" yaml:"secretName"`
 }
 
