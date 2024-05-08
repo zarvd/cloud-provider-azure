@@ -1482,7 +1482,13 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/common/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
+<<<<<<< HEAD
 # sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.0.18
+||||||| parent of 7b32e21be (Setup multi-tenant credential)
+# sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.0.15
+=======
+# sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.0.15 => ./pkg/azclient
+>>>>>>> 7b32e21be (Setup multi-tenant credential)
 ## explicit; go 1.20
 sigs.k8s.io/cloud-provider-azure/pkg/azclient
 sigs.k8s.io/cloud-provider-azure/pkg/azclient/accountclient
@@ -1544,3 +1550,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
+# sigs.k8s.io/cloud-provider-azure/pkg/azclient => ./pkg/azclient
