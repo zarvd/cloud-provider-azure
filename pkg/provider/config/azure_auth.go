@@ -191,7 +191,7 @@ func GetMultiTenantServicePrincipalToken(config *AzureAuthConfig, env *azure.Env
 		return nil, fmt.Errorf("creating the multi-tenant OAuth config: %w", err)
 	}
 
-	if len(config.AADClientSecret) > 0 {
+	if len(config.AADClientSecret) > 0 && !strings.EqualFold(config.AADClientSecret, "msi") {
 		logger.V(2).Info("Setup ARM multi-tenant token provider", "method", "sp_with_password")
 		return adal.NewMultiTenantServicePrincipalToken(
 			multiTenantOAuthConfig,
@@ -251,7 +251,7 @@ func GetNetworkResourceServicePrincipalToken(config *AzureAuthConfig, env *azure
 		return nil, fmt.Errorf("creating the OAuth config for network resources tenant: %w", err)
 	}
 
-	if len(config.AADClientSecret) > 0 {
+	if len(config.AADClientSecret) > 0 && !strings.EqualFold(config.AADClientSecret, "msi") {
 		logger.V(2).Info("Setup ARM network resource token provider", "method", "sp_with_password")
 		return adal.NewServicePrincipalToken(
 			*oauthConfig,
