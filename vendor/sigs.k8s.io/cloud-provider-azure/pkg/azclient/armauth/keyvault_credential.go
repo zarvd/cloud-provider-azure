@@ -25,9 +25,10 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
 
-	"sigs.k8s.io/cloud-provider-azure/pkg/azclient/secretclient"
 	"sigs.k8s.io/cloud-provider-azure/pkg/azclient/utils"
+	"sigs.k8s.io/cloud-provider-azure/pkg/azclient/vaultclient"
 )
 
 type SecretResourceID struct {
@@ -42,7 +43,8 @@ func (s SecretResourceID) String() string {
 }
 
 type KeyVaultCredential struct {
-	secretClient     secretclient.Interface
+	secretClient     *azsecrets.Client
+	vaultURI         string
 	secretResourceID SecretResourceID
 
 	mtx   sync.RWMutex
@@ -58,9 +60,31 @@ func NewKeyVaultCredential(
 	msiCredential azcore.TokenCredential,
 	secretResourceID SecretResourceID,
 ) (*KeyVaultCredential, error) {
-	cli, err := secretclient.New(secretResourceID.SubscriptionID, msiCredential, utils.GetDefaultOption())
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Get KeyVault URI
+	var vaultURI string
+	{
+		vaultCli, err := vaultclient.New(secretResourceID.SubscriptionID, msiCredential, utils.GetDefaultOption())
+		if err != nil {
+			return nil, fmt.Errorf("create KeyVault client: %w", err)
+		}
+
+		vault, err := vaultCli.Get(ctx, secretResourceID.ResourceGroup, secretResourceID.VaultName)
+		if err != nil {
+			return nil, fmt.Errorf("get vault %s: %w", secretResourceID.VaultName, err)
+		}
+
+		if vault.Properties == nil || vault.Properties.VaultURI == nil {
+			return nil, fmt.Errorf("vault uri is nil")
+		}
+		vaultURI = *vault.Properties.VaultURI
+	}
+
+	cli, err := azsecrets.NewClient(vaultURI, msiCredential, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create KeyVault client: %w", err)
+		return nil, fmt.Errorf("create secret client: %w", err)
 	}
 
 	rv := &KeyVaultCredential{
@@ -69,8 +93,6 @@ func NewKeyVaultCredential(
 		secretResourceID: secretResourceID,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	if err := rv.refreshToken(ctx); err != nil {
 		return nil, fmt.Errorf("refresh token from %s: %w", secretResourceID, err)
 	}
@@ -80,6 +102,7 @@ func NewKeyVaultCredential(
 
 func (c *KeyVaultCredential) refreshToken(ctx context.Context) error {
 	const (
+		LatestVersion      = ""
 		RefreshTokenOffset = 5 * time.Minute
 	)
 
@@ -99,17 +122,17 @@ func (c *KeyVaultCredential) refreshToken(ctx context.Context) error {
 		return nil
 	}
 
-	resp, err := c.secretClient.Get(ctx, c.secretResourceID.ResourceGroup, c.secretResourceID.VaultName, c.secretResourceID.SecretName)
+	resp, err := c.secretClient.GetSecret(ctx, c.secretResourceID.SecretName, LatestVersion, nil)
 	if err != nil {
 		return err
 	}
-	if resp.Properties == nil || resp.Properties.Value == nil {
+	if resp.Value == nil {
 		return fmt.Errorf("secret value is nil")
 	}
 
 	var secret KeyVaultCredentialSecret
-	if err := json.Unmarshal([]byte(*resp.Properties.Value), &secret); err != nil {
-		return fmt.Errorf("unmarshal secret value `%s`: %w", *resp.Properties.Value, err)
+	if err := json.Unmarshal([]byte(*resp.Value), &secret); err != nil {
+		return fmt.Errorf("unmarshal secret value `%s`: %w", *resp.Value, err)
 	}
 
 	c.token = &azcore.AccessToken{
