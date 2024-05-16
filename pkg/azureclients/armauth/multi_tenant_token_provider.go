@@ -29,6 +29,7 @@ func NewMultiTenantTokenProvider(
 		primaryCredential:    primaryCredential,
 		auxiliaryCredentials: auxiliaryCredentials,
 		timeout:              10 * time.Second,
+		scope:                scope,
 	}, nil
 }
 
