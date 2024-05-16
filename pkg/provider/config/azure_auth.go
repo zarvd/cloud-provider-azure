@@ -19,20 +19,19 @@ package config
 import (
 	"errors"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"io"
 	"os"
-	"sigs.k8s.io/cloud-provider-azure/pkg/azureclients/armauth"
 	"strings"
 
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 
-	"k8s.io/klog/v2"
-
 	"sigs.k8s.io/cloud-provider-azure/pkg/azclient"
+	"sigs.k8s.io/cloud-provider-azure/pkg/azureclients/armauth"
 	"sigs.k8s.io/cloud-provider-azure/pkg/consts"
 )
 
@@ -224,6 +223,7 @@ func GetMultiTenantServicePrincipalToken(config *AzureAuthConfig, env *azure.Env
 			klog.Background().WithName("multi-tenant-resource-token-provider"),
 			authProvider.ManagedIdentityCredential,
 			[]azcore.TokenCredential{authProvider.NetworkTokenCredential},
+			authProvider.TokenScope(),
 		)
 	}
 
@@ -280,9 +280,11 @@ func GetNetworkResourceServicePrincipalToken(config *AzureAuthConfig, env *azure
 
 	if authProvider.ManagedIdentityCredential != nil && authProvider.NetworkTokenCredential != nil {
 		logger.V(2).Info("Setup ARM network resource token provider", "method", "msi_with_auxiliary_token")
+
 		return armauth.NewTokenProvider(
 			klog.Background().WithName("network-resource-token-provider"),
 			authProvider.NetworkTokenCredential,
+			authProvider.TokenScope(),
 		)
 	}
 

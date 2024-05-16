@@ -20,11 +20,13 @@ type TokenProvider struct {
 func NewTokenProvider(
 	logger logr.Logger,
 	credential azcore.TokenCredential,
+	scope string,
 ) (*TokenProvider, error) {
 	return &TokenProvider{
 		logger:     logger,
 		credential: credential,
 		timeout:    10 * time.Second,
+		scope:      scope,
 	}, nil
 }
 

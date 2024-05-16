@@ -22,6 +22,7 @@ func NewMultiTenantTokenProvider(
 	logger logr.Logger,
 	primaryCredential azcore.TokenCredential,
 	auxiliaryCredentials []azcore.TokenCredential,
+	scope string,
 ) (*MultiTenantTokenProvider, error) {
 	return &MultiTenantTokenProvider{
 		logger:               logger,
