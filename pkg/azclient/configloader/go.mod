@@ -2,7 +2,7 @@ module sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader
 
 go 1.22.0
 
-toolchain go1.22.2
+toolchain go1.22.3
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.11.1

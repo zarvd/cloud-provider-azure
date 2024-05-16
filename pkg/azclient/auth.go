@@ -88,8 +88,7 @@ func NewAuthProvider(armConfig *ARMClientConfig, config *AzureAuthConfig, client
 	if config.UseManagedIdentityExtension && config.AuxiliaryTokenProvider != nil && IsMultiTenant(armConfig) {
 		networkTokenCredential, err = armauth.NewKeyVaultCredential(
 			managedIdentityCredential,
-			config.AuxiliaryTokenProvider.KeyVaultURL,
-			config.AuxiliaryTokenProvider.SecretName,
+			config.AuxiliaryTokenProvider.SecretResourceID(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("create KeyVaultCredential for auxiliary token provider: %w", err)
