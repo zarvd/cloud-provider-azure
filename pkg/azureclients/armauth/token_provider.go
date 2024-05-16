@@ -42,5 +42,6 @@ func (p *TokenProvider) OAuthToken() string {
 		p.logger.Error(err, "Failed to fetch OAuth token")
 		return ""
 	}
+	p.logger.V(4).Info("Fetched OAuth token successfully", "token", token.Token)
 	return token.Token
 }
