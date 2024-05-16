@@ -25,7 +25,9 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+
 	"sigs.k8s.io/cloud-provider-azure/pkg/azclient/secretclient"
+	"sigs.k8s.io/cloud-provider-azure/pkg/azclient/utils"
 )
 
 type SecretResourceID struct {
@@ -33,6 +35,10 @@ type SecretResourceID struct {
 	ResourceGroup  string
 	VaultName      string
 	SecretName     string
+}
+
+func (s SecretResourceID) String() string {
+	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.KeyVault/vaults/%s/secrets/%s", s.SubscriptionID, s.ResourceGroup, s.VaultName, s.SecretName)
 }
 
 type KeyVaultCredential struct {
@@ -52,7 +58,7 @@ func NewKeyVaultCredential(
 	msiCredential azcore.TokenCredential,
 	secretResourceID SecretResourceID,
 ) (*KeyVaultCredential, error) {
-	cli, err := secretclient.New(secretResourceID.SubscriptionID, msiCredential, nil)
+	cli, err := secretclient.New(secretResourceID.SubscriptionID, msiCredential, utils.GetDefaultOption())
 	if err != nil {
 		return nil, fmt.Errorf("create KeyVault client: %w", err)
 	}
@@ -66,7 +72,7 @@ func NewKeyVaultCredential(
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := rv.refreshToken(ctx); err != nil {
-		return nil, fmt.Errorf("refresh token: %w", err)
+		return nil, fmt.Errorf("refresh token from %s: %w", secretResourceID, err)
 	}
 
 	return rv, nil
