@@ -93,14 +93,14 @@ func NewKeyVaultCredential(
 		secretResourceID: secretResourceID,
 	}
 
-	if err := rv.refreshToken(ctx); err != nil {
+	if _, err := rv.refreshToken(ctx); err != nil {
 		return nil, fmt.Errorf("refresh token from %s: %w", secretResourceID, err)
 	}
 
 	return rv, nil
 }
 
-func (c *KeyVaultCredential) refreshToken(ctx context.Context) error {
+func (c *KeyVaultCredential) refreshToken(ctx context.Context) (*azcore.AccessToken, error) {
 	const (
 		LatestVersion      = ""
 		RefreshTokenOffset = 5 * time.Minute
@@ -110,7 +110,7 @@ func (c *KeyVaultCredential) refreshToken(ctx context.Context) error {
 		c.mtx.RLock()
 		if c.token != nil && c.token.ExpiresOn.Add(RefreshTokenOffset).Before(time.Now()) {
 			c.mtx.RUnlock()
-			return nil
+			return nil, nil
 		}
 		c.mtx.RUnlock()
 	}
@@ -119,20 +119,33 @@ func (c *KeyVaultCredential) refreshToken(ctx context.Context) error {
 	defer c.mtx.Unlock()
 
 	if c.token != nil && c.token.ExpiresOn.Add(RefreshTokenOffset).Before(time.Now()) {
-		return nil
+		return nil, nil
 	}
 
 	resp, err := c.secretClient.GetSecret(ctx, c.secretResourceID.SecretName, LatestVersion, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if resp.Value == nil {
-		return fmt.Errorf("secret value is nil")
+		return nil, fmt.Errorf("secret value is nil")
 	}
 
 	var secret KeyVaultCredentialSecret
 	if err := json.Unmarshal([]byte(*resp.Value), &secret); err != nil {
-		return fmt.Errorf("unmarshal secret value `%s`: %w", *resp.Value, err)
+		return nil, fmt.Errorf("unmarshal secret value `%s`: %w", *resp.Value, err)
+	}
+
+	if secret.AccessToken == "" {
+		return nil, fmt.Errorf("access token is empty")
+	}
+
+	// FIXME: Remove me
+	{
+		v, _ := json.MarshalIndent(secret, "", "  ")
+		println(string(v))
+		fmt.Printf("token = %s\n", secret.AccessToken)
+		println("=====================================")
+		println("=====================================")
 	}
 
 	c.token = &azcore.AccessToken{
@@ -140,13 +153,19 @@ func (c *KeyVaultCredential) refreshToken(ctx context.Context) error {
 		ExpiresOn: secret.ExpiresOn,
 	}
 
-	return nil
+	// Return a copy of the token to avoid concurrent modification
+	return &azcore.AccessToken{
+		Token:     secret.AccessToken,
+		ExpiresOn: secret.ExpiresOn,
+	}, nil
 }
 
 func (c *KeyVaultCredential) GetToken(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
-	if err := c.refreshToken(ctx); err != nil {
+
+	token, err := c.refreshToken(ctx)
+	if err != nil {
 		return azcore.AccessToken{}, fmt.Errorf("refresh token: %w", err)
 	}
 
-	return *c.token, nil
+	return *token, nil
 }
