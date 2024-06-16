@@ -64,8 +64,6 @@ func (az *Cloud) listSharedIPPortMapping(
 		rv     = make(map[network.SecurityRuleProtocol][]int32)
 	)
 
-	logger.Info("debug log", "svc", svc, "ingressIPs", ingressIPs)
-
 	var services []*v1.Service
 	{
 		var err error
@@ -91,7 +89,6 @@ func (az *Cloud) listSharedIPPortMapping(
 	for _, s := range services {
 		logger.V(4).Info("iterating service", "service", s.Name, "namespace", s.Namespace)
 		if svc.Namespace == s.Namespace && svc.Name == s.Name {
-			logger.Info("debug log from lister", "reconciled-svc", svc, "fetched-svc", svc)
 			// skip the service itself
 			continue
 		}

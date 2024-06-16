@@ -2906,7 +2906,7 @@ func (az *Cloud) reconcileSecurityGroup(
 	}
 
 	{
-		retainPortRanges, err := az.listSharedIPPortMapping(ctx, service, lbIPAddresses)
+		retainPortRanges, err := az.listSharedIPPortMapping(ctx, service, append(dstIPv4Addresses, dstIPv6Addresses...))
 		if err != nil {
 			logger.Error(err, "Failed to list retain port ranges")
 			return nil, err
