@@ -24,47 +24,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2022-07-01/network"
-	"github.com/Azure/go-autorest/autorest/azure"
 
-	azcache "sigs.k8s.io/cloud-provider-azure/pkg/cache"
 	"sigs.k8s.io/cloud-provider-azure/pkg/consts"
 	"sigs.k8s.io/cloud-provider-azure/pkg/provider/loadbalancer"
 	"sigs.k8s.io/cloud-provider-azure/pkg/provider/loadbalancer/fnutil"
 )
-
-// listIPAddressesByPublicIPIDs retrieves a list of netip.Addr from the specified Azure.PublicIPAddress IDs.
-func (az *Cloud) listIPAddressesByPublicIPIDs(ctx context.Context, pipIDs []string) ([]netip.Addr, error) {
-	logger := klog.FromContext(ctx).WithName("listIPAddressesByPublicIPID")
-
-	rv := make([]netip.Addr, 0, len(pipIDs))
-
-	for _, id := range pipIDs {
-		resourceID, err := azure.ParseResourceID(id)
-		if err != nil {
-			logger.Error(err, "Invalid resource ID of Public IP", "id", id)
-			continue // FIXME fix unit tests that using dumb string as ID
-		}
-
-		logger.Info("Fetching Public IP", "pip-id", resourceID)
-		pip, _, err := az.getPublicIPAddress(resourceID.ResourceGroup, resourceID.ResourceName, azcache.CacheReadTypeDefault)
-		if err != nil {
-			logger.Error(err, "Failed to fetch Public IP", "pip-id", resourceID)
-			return nil, err
-		}
-
-		ip, err := netip.ParseAddr(*pip.IPAddress)
-		if err != nil {
-			logger.Error(err, "Failed to parse Public IP address", "ip", *pip.IPAddress)
-			return nil, err
-		}
-		rv = append(rv, ip)
-	}
-
-	return rv, nil
-}
 
 func filterServicesByIngressIPs(services []*v1.Service, ips []netip.Addr) []*v1.Service {
 	targetIPs := fnutil.Map(func(ip netip.Addr) string { return ip.String() }, ips)
@@ -91,12 +57,14 @@ func filterServicesByDisableFloatingIP(services []*v1.Service) []*v1.Service {
 func (az *Cloud) listSharedIPPortMapping(
 	ctx context.Context,
 	svc *v1.Service,
-	publicIPs []network.PublicIPAddress,
+	ingressIPs []netip.Addr,
 ) (map[network.SecurityRuleProtocol][]int32, error) {
 	var (
 		logger = klog.FromContext(ctx).WithName("listSharedIPPortMapping")
 		rv     = make(map[network.SecurityRuleProtocol][]int32)
 	)
+
+	logger.Info("debug log", "svc", svc, "ingressIPs", ingressIPs)
 
 	var services []*v1.Service
 	{
@@ -115,13 +83,7 @@ func (az *Cloud) listSharedIPPortMapping(
 			services = filterServicesByDisableFloatingIP(services)
 		} else {
 			logger.Info("Filter service by external IPs")
-			pipIDs := fnutil.Map(func(ip network.PublicIPAddress) string { return ptr.Deref(ip.ID, "") }, publicIPs)
-			ips, err := az.listIPAddressesByPublicIPIDs(ctx, pipIDs)
-			if err != nil {
-				logger.Error(err, "Failed to list external IPs of services")
-				return nil, err
-			}
-			services = filterServicesByIngressIPs(services, ips)
+			services = filterServicesByIngressIPs(services, ingressIPs)
 		}
 	}
 	logger.Info("Filtered services", "num-filtered-services", len(services))
@@ -129,6 +91,7 @@ func (az *Cloud) listSharedIPPortMapping(
 	for _, s := range services {
 		logger.V(4).Info("iterating service", "service", s.Name, "namespace", s.Namespace)
 		if svc.Namespace == s.Namespace && svc.Name == s.Name {
+			logger.Info("debug log from lister", "reconciled-svc", svc, "fetched-svc", svc)
 			// skip the service itself
 			continue
 		}

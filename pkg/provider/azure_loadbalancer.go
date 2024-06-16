@@ -142,7 +142,7 @@ func (az *Cloud) reconcileService(_ context.Context, clusterName string, service
 
 	serviceIPs := lbIPsPrimaryPIPs
 	klog.V(2).Infof("reconcileService: reconciling security group for service %q with IPs %q, wantLb = true", serviceName, serviceIPs)
-	if _, err := az.reconcileSecurityGroup(clusterName, service, ptr.Deref(lb.Name, ""), fipConfigs, serviceIPs, true /* wantLb */); err != nil {
+	if _, err := az.reconcileSecurityGroup(clusterName, service, ptr.Deref(lb.Name, ""), serviceIPs, true /* wantLb */); err != nil {
 		klog.Errorf("reconcileSecurityGroup(%s) failed: %#v", serviceName, err)
 		return nil, err
 	}
@@ -322,13 +322,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(_ context.Context, clusterName string
 	serviceIPsToCleanup := lbIPsPrimaryPIPs
 	klog.V(2).Infof("EnsureLoadBalancerDeleted: reconciling security group for service %q with IPs %q, wantLb = false", serviceName, serviceIPsToCleanup)
 
-	_, _, fipConfigs, err := az.getServiceLoadBalancerStatus(service, lb)
-	if err != nil {
-		klog.Errorf("EnsureLoadBalancerDeleted: getServiceLoadBalancerStatus(%s) failed: %v", serviceName, err)
-		return err
-	}
-
-	_, err = az.reconcileSecurityGroup(clusterName, service, ptr.Deref(lb.Name, ""), fipConfigs, serviceIPsToCleanup, false /* wantLb */)
+	_, err = az.reconcileSecurityGroup(clusterName, service, ptr.Deref(lb.Name, ""), serviceIPsToCleanup, false /* wantLb */)
 	if err != nil {
 		return err
 	}
@@ -2811,7 +2805,6 @@ func (az *Cloud) getExpectedHAModeLoadBalancingRuleProperties(
 func (az *Cloud) reconcileSecurityGroup(
 	clusterName string, service *v1.Service,
 	lbName string,
-	fipConfigs []*network.FrontendIPConfiguration,
 	lbIPs []string, wantLb bool,
 ) (*network.SecurityGroup, error) {
 	logger := klog.Background().WithName("reconcileSecurityGroup").
@@ -2825,13 +2818,6 @@ func (az *Cloud) reconcileSecurityGroup(
 
 	if wantLb && len(lbIPs) == 0 {
 		return nil, fmt.Errorf("no load balancer IP for setting up security rules for service %s", service.Name)
-	}
-
-	var publicIPs []network.PublicIPAddress
-	for _, fipConfig := range fipConfigs {
-		if fipConfig.PublicIPAddress != nil {
-			publicIPs = append(publicIPs, *fipConfig.PublicIPAddress)
-		}
 	}
 
 	additionalIPs, err := loadbalancer.AdditionalPublicIPs(service)
@@ -2920,7 +2906,7 @@ func (az *Cloud) reconcileSecurityGroup(
 	}
 
 	{
-		retainPortRanges, err := az.listSharedIPPortMapping(ctx, service, publicIPs)
+		retainPortRanges, err := az.listSharedIPPortMapping(ctx, service, lbIPAddresses)
 		if err != nil {
 			logger.Error(err, "Failed to list retain port ranges")
 			return nil, err
