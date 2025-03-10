@@ -67,6 +67,14 @@ func BeginARMRequestWithAttributes(attributes ...attribute.KeyValue) *ARMContext
 // It's a convenience method for calling Done, Errored, RateLimited, or Throttled.
 // You should not call this method after calling one of the other methods.
 func (c *ARMContext) Observe(ctx context.Context, err error) {
+
+	// For testing purpose.
+	{
+		c.RateLimited(ctx)
+		c.Throttled(ctx)
+		c.Errored(ctx, errors.New("test error"))
+	}
+
 	if err == nil {
 		c.Done(ctx)
 		return
