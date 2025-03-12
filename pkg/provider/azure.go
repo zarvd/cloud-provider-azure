@@ -24,9 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -44,7 +41,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/cloud-provider-azure/pkg/azclient"
-	"sigs.k8s.io/cloud-provider-azure/pkg/azclient/armauth"
 	"sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader"
 	azcache "sigs.k8s.io/cloud-provider-azure/pkg/cache"
 	"sigs.k8s.io/cloud-provider-azure/pkg/consts"
@@ -403,39 +399,15 @@ func (az *Cloud) InitializeCloudFromConfig(ctx context.Context, config *config.C
 	}
 
 	if az.ComputeClientFactory == nil {
-		var cred azcore.TokenCredential
+		var (
+			computeCred = az.AuthProvider.GetAzIdentity()
+			networkCred = az.AuthProvider.GetNetworkAzIdentity()
+		)
 
-		if az.AuthProvider.IsMultiTenantModeEnabled() {
-			// It uses Service Principal as the multi-tenant credential.
-			// TODO: refactor `IsMultiTenantModeEnabled` to make it more clear.
-			multiTenantCred := az.AuthProvider.GetMultiTenantIdentity()
-			networkTenantCred := az.AuthProvider.GetNetworkAzIdentity()
+		if networkCred != nil {
 			az.NetworkClientFactory, err = azclient.NewClientFactory(&azclient.ClientFactoryConfig{
 				SubscriptionID: az.NetworkResourceSubscriptionID,
-			}, &az.ARMClientConfig, clientOps.Cloud, networkTenantCred)
-			if err != nil {
-				return err
-			}
-			cred = multiTenantCred
-		} else {
-			cred = az.AuthProvider.GetAzIdentity()
-		}
-
-		var opts []func(option *arm.ClientOptions)
-		if az.AzureAuthConfig.AuxiliaryTokenProvider != nil && az.AzureAuthConfig.UseManagedIdentityExtension {
-			klog.InfoS("Using auxiliary token provider for ARM network credential")
-			// Multi-tenant mode with auxiliary token provider.
-			// It uses Managed Identity as the primary credential and auxiliary token provider as the auxiliary credential.
-			opts = append(opts, func(option *arm.ClientOptions) {
-				option.PerRetryPolicies = append(option.PerRetryPolicies, armauth.NewAuxiliaryAuthPolicy(
-					[]azcore.TokenCredential{az.AuthProvider.GetNetworkAzIdentity()},
-					az.AuthProvider.DefaultTokenScope(),
-				))
-			})
-
-			az.NetworkClientFactory, err = azclient.NewClientFactory(&azclient.ClientFactoryConfig{
-				SubscriptionID: az.NetworkResourceSubscriptionID,
-			}, &az.ARMClientConfig, clientOps.Cloud, az.AuthProvider.GetNetworkAzIdentity())
+			}, &az.ARMClientConfig, clientOps.Cloud, networkCred)
 			if err != nil {
 				return err
 			}
@@ -443,11 +415,13 @@ func (az *Cloud) InitializeCloudFromConfig(ctx context.Context, config *config.C
 
 		az.ComputeClientFactory, err = azclient.NewClientFactory(&azclient.ClientFactoryConfig{
 			SubscriptionID: az.SubscriptionID,
-		}, &az.ARMClientConfig, clientOps.Cloud, cred, opts...)
+		}, &az.ARMClientConfig, clientOps.Cloud, computeCred, az.AuthProvider.AdditionalComputeClientOptions...)
 		if err != nil {
 			return err
 		}
+
 		if az.NetworkClientFactory == nil {
+			// Fallback to compute client factory if network client factory is not set
 			az.NetworkClientFactory = az.ComputeClientFactory
 		}
 	}
