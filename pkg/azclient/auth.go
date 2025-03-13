@@ -24,6 +24,8 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	armpolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
+	armruntime "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -98,10 +100,15 @@ func NewAuthProvider(
 
 			// Additionally, we need to add the auxiliary token to the HTTP header when making requests to the compute resources
 			additionalComputeClientOptions = append(additionalComputeClientOptions, func(option *arm.ClientOptions) {
-				option.PerRetryPolicies = append(option.PerRetryPolicies, armauth.NewAuxiliaryAuthPolicy(
-					[]azcore.TokenCredential{networkCredential},
-					DefaultTokenScopeFor(clientOption.Cloud),
-				))
+				option.PerRetryPolicies = append(option.PerRetryPolicies,
+					armruntime.NewBearerTokenPolicy(
+						networkCredential,
+						&armpolicy.BearerTokenOptions{
+							AuxiliaryTenants: []string{armConfig.NetworkResourceTenantID},
+							Scopes:           []string{DefaultTokenScopeFor(clientOption.Cloud)},
+						},
+					),
+				)
 			})
 		}
 	}
